@@ -20,7 +20,16 @@ function policy(p) {
   if (/(^|\/)(wp-config\.php|\.env(?:\..*)?|uploads|cccd|error_log|\.git|\.ssh|\.aws)(\/|$)|\.(sql(?:\.gz)?|zip|pem|key|p12|pfx)$/i.test(p)) return 'File nhạy cảm hoặc dữ liệu không được đóng gói';
   return '';
 }
-function excluded(p) { return /^(docs|tools|tests|\.agents|\.claude|\.codex|\.github|\.deploy-temp|node_modules)(\/|$)|(^|\/)(AGENTS\.md|CLAUDE\.md)$|^deploy-files\.txt$/i.test(p); }
+function excluded(p) { return /^(docs|tools|tests|\.agents|\.claude|\.codex|\.github|\.deploy-temp|node_modules)(\/|$)|(^|\/)(AGENTS\.md|CLAUDE\.md)$|^(deploy-files\.txt|\.zipignore)$/i.test(p); }
+function ignoreMatcher(text) {
+  const rules = text.replace(/^\uFEFF/, '').split(/\r?\n/).map(x => x.trim()).filter(x => x && !x.startsWith('#'));
+  // "!" rules are listed but never compiled: .zipignore can only add exclusions.
+  const patterns = rules.filter(x => !x.startsWith('!')).map(rule => {
+    const r = rule.replace(/^\/+|\/+$/g, '');
+    return new RegExp('^' + r.split('**').map(s => s.split('*').map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('.*') + '(/|$)', 'i');
+  });
+  return { rules, match: p => patterns.some(re => re.test(p)) };
+}
 function tagCheck(repo, tag, sha) {
   if (!tag || tag.startsWith('-') || /[\x00-\x20]/.test(tag)) throw new Error('Tên tag không hợp lệ.');
   git(repo, ['check-ref-format', `refs/tags/${tag}`]);
@@ -41,22 +50,28 @@ function preview(input) {
     const at = line.indexOf('\t'); const [mode, type, oid] = line.slice(0, at).split(' ');
     return [line.slice(at + 1), { mode, type, oid }];
   }));
+  const counts = new Map(git(repo, ['diff', '--no-ext-diff', '--no-renames', '--numstat', '-z', baseSha, targetSha, '--']).split('\0').filter(Boolean).map(line => {
+    const a = line.indexOf('\t'), b = line.indexOf('\t', a + 1), n = x => x === '-' ? null : Number(x);
+    return [line.slice(b + 1), { added: n(line.slice(0, a)), removed: n(line.slice(a + 1, b)) }];
+  }));
+  const ignoreFile = tree.get('.zipignore');
+  const ignore = ignoreMatcher(ignoreFile ? git(repo, ['cat-file', 'blob', ignoreFile.oid]) : '');
   const files = [], deleted = [], blocked = [], omitted = [];
   const names = new Set();
   for (let i = 0; i < changes.length; i += 2) {
     const status = changes[i], p = changes[i + 1];
     const reason = policy(p);
     if (reason) { blocked.push({ path: p, reason }); continue; }
-    if (excluded(p)) { omitted.push(p); continue; }
+    if (excluded(p) || ignore.match(p)) { omitted.push(p); continue; }
     if (status === 'D') { deleted.push(p); continue; }
     const entry = tree.get(p);
     if (!entry || entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode)) { blocked.push({ path: p, reason: 'Symlink hoặc submodule không được hỗ trợ' }); continue; }
     const key = p.toLowerCase();
     if (names.has(key)) { blocked.push({ path: p, reason: 'Trùng đường dẫn khi không phân biệt hoa thường' }); continue; }
-    names.add(key); files.push({ path: p, status, oid: entry.oid });
+    names.add(key); files.push({ path: p, status, oid: entry.oid, ...counts.get(p) });
   }
   const label = (tag || input.target).replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 70) || targetSha.slice(0, 8);
-  return { id: crypto.randomUUID(), repo, base: input.base, target: input.target, baseSha, targetSha, environment: input.environment, tag, files, deleted, blocked, excluded: omitted, zipName: `deploy-${input.environment}-${label}.zip`, dirty: Boolean(git(repo, ['status', '--porcelain', '--untracked-files=no']).trim()) };
+  return { id: crypto.randomUUID(), repo, base: input.base, target: input.target, baseSha, targetSha, environment: input.environment, tag, files, deleted, blocked, excluded: omitted, ignoreRules: ignore.rules, zipName: `deploy-${input.environment}-${label}.zip`, dirty: Boolean(git(repo, ['status', '--porcelain', '--untracked-files=no']).trim()) };
 }
 function build(p, options = {}) {
   if (p.blocked.length) throw new Error('Có file nhạy cảm hoặc không an toàn. Hãy sửa phạm vi commit trước khi đóng gói.');

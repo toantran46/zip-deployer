@@ -113,3 +113,27 @@ test('preview pins commit when branch moves and rejects symlinks and Windows-inv
   assert(unsafe.blocked.some(x => x.path === 'link.php'));
   assert(unsafe.blocked.some(x => x.path === 'bad?.php'));
 });
+
+test('preview reports per-file line counts; binary is null; unicode paths keep counts', () => {
+  const f = fixture(); const p = preview(f.request);
+  const byPath = Object.fromEntries(p.files.map(x => [x.path, x]));
+  assert.deepEqual([byPath['change.php'].added, byPath['change.php'].removed], [1, 1]);
+  assert.deepEqual([byPath['binary.bin'].added, byPath['binary.bin'].removed], [null, null]);
+  assert.equal(byPath['folder/tên có dấu.txt'].added, 1);
+});
+
+test('.zipignore from the target commit adds exclusions but never unblocks', () => {
+  const f = fixture();
+  f.write('.zipignore', '﻿# comment\r\nassets/*.map\r\n\r\n/build/\r\n!wp-config.php\r\n');
+  f.write('assets/app.js.map', 'x'); f.write('assets/app.js', 'x'); f.write('build/out.js', 'x'); f.write('wp-config.php', 'secret');
+  f.git('add', '.'); f.git('commit', '-qm', 'ignore');
+  const p = preview(f.request);
+  assert.deepEqual(p.ignoreRules, ['assets/*.map', '/build/', '!wp-config.php']);
+  assert(p.excluded.includes('assets/app.js.map') && p.excluded.includes('build/out.js') && p.excluded.includes('.zipignore'));
+  assert(p.files.some(x => x.path === 'assets/app.js'));
+  assert(p.blocked.some(x => x.path === 'wp-config.php'));
+  f.write('.zipignore', '**\n'); f.git('add', '.'); f.git('commit', '-qm', 'all');
+  const all = preview(f.request);
+  assert.equal(all.files.length, 0);
+  assert.throws(() => build({ ...all, blocked: [] }, { outputRoot: path.join(f.repo, 'out'), acknowledgeDeletes: true }), /Không có file/);
+});
