@@ -25,8 +25,9 @@ function ignoreMatcher(text) {
   const rules = text.replace(/^\uFEFF/, '').split(/\r?\n/).map(x => x.trim()).filter(x => x && !x.startsWith('#'));
   // "!" rules are listed but never compiled: .zipignore can only add exclusions.
   const patterns = rules.filter(x => !x.startsWith('!')).map(rule => {
-    const r = rule.replace(/^\/+|\/+$/g, '');
-    return new RegExp('^' + r.split('**').map(s => s.split('*').map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('.*') + '(/|$)', 'i');
+    // A "**/" segment means zero or more folders (\0 marks it), so "**/*.log" also matches a root "debug.log".
+    const r = rule.replace(/^\/+|\/+$/g, '').replace(/^\*\*\//, '\0').split('/**/').join('/\0');
+    return new RegExp('^' + r.split('**').map(s => s.split('*').map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('.*').split('\0').join('(?:.*/)?') + '(/|$)', 'i');
   });
   return { rules, match: p => patterns.some(re => re.test(p)) };
 }
@@ -76,7 +77,9 @@ function preview(input) {
     return [line.slice(b + 1), { added: n(line.slice(0, a)), removed: n(line.slice(a + 1, b)) }];
   }));
   const ignoreFile = tree.get('.zipignore');
-  const ignore = ignoreMatcher(ignoreFile ? git(repo, ['cat-file', 'blob', ignoreFile.oid]) : '');
+  // Windows PowerShell 5.1 "echo > .zipignore" writes UTF-16LE with a BOM.
+  const raw = ignoreFile ? git(repo, ['cat-file', 'blob', ignoreFile.oid], true) : Buffer.alloc(0);
+  const ignore = ignoreMatcher(raw[0] === 0xff && raw[1] === 0xfe ? raw.toString('utf16le') : raw.toString('utf8'));
   const files = [], deleted = [], blocked = [], omitted = [];
   const names = new Set();
   for (let i = 0; i < changes.length; i += 2) {

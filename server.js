@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const core = require('./core');
 
-function createServer(defaultRepo = '') {
+function createServer(defaultRepo = '', { outputRoot } = {}) {
   const token = crypto.randomBytes(32).toString('hex');
   const instance = crypto.randomUUID();
   let currentPreview, currentBuild;
@@ -28,7 +28,7 @@ function createServer(defaultRepo = '') {
     if (req.headers['x-app-token'] !== token) return json(403, { error: 'Phiên làm việc không hợp lệ. Mở lại app.' });
     try {
       if (req.method === 'GET' && req.url === '/api/context') return json(200, { repo: defaultRepo });
-      if (req.method === 'GET' && req.url === '/api/history') return json(200, { builds: core.history() });
+      if (req.method === 'GET' && req.url === '/api/history') return json(200, { builds: core.history(outputRoot) });
       if (req.method === 'GET' && req.url === '/api/download') {
         if (!currentBuild) throw new Error('Chưa có ZIP đã xác minh.');
         res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${currentBuild.zipName}"` });
@@ -45,7 +45,7 @@ function createServer(defaultRepo = '') {
       }
       if (req.url === '/api/build') {
         if (!currentPreview || body.id !== currentPreview.id) throw new Error('Hãy xem trước lại danh sách file.');
-        currentBuild = core.build(currentPreview, { acknowledgeDeletes: body.acknowledgeDeletes === true });
+        currentBuild = core.build(currentPreview, { acknowledgeDeletes: body.acknowledgeDeletes === true, outputRoot });
         return json(200, currentBuild);
       }
       if (req.url === '/api/publish') {
@@ -55,7 +55,7 @@ function createServer(defaultRepo = '') {
       if (req.url === '/api/tags') return json(200, { tags: core.tags(body.repo) });
       if (req.url === '/api/reveal') {
         // Only the current build or a folder listed in deploy history can be opened.
-        const dir = body.dir ? core.historyDir(body.dir) : currentBuild?.dir;
+        const dir = body.dir ? core.historyDir(body.dir, outputRoot) : currentBuild?.dir;
         if (!dir) throw new Error('Chưa có kết quả.');
         const child = spawn('explorer.exe', [dir], { detached: true, stdio: 'ignore', windowsHide: true });
         child.on('error', () => {}); child.unref(); return json(200, { dir });

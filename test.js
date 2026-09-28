@@ -71,7 +71,7 @@ test('publish pushes only selected tag to a local bare remote; conflicts cannot 
 
 test('HTTP server protects operations and completes preview/build/download without a tag write', async t => {
   const { createServer } = require('./server');
-  const f = fixture(); const { server } = createServer(f.repo);
+  const f = fixture(); const outputRoot = path.join(f.repo, 'out'); const { server } = createServer(f.repo, { outputRoot });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => { server.closeAllConnections(); server.close(); });
   const url = `http://127.0.0.1:${server.address().port}`;
@@ -95,7 +95,8 @@ test('HTTP server protects operations and completes preview/build/download witho
   assert.equal(download.status, 200);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), fs.readFileSync(output.zipPath));
   assert.deepEqual((await (await post('tags', { repo: f.repo })).json()).tags, ['1.0.0']);
-  assert.equal((await fetch(url + '/api/history', { headers })).status, 200);
+  assert.equal(path.dirname(output.dir), outputRoot); // tests never write into the real output/ history
+  assert.deepEqual((await (await fetch(url + '/api/history', { headers })).json()).builds.map(x => x.dir), [output.dir]);
   assert.equal((await post('reveal', { dir: 'C:\\Windows' })).status, 400);
   assert(!f.git('tag').includes('1.1.0'));
   console.log(`Browser fixture: ${f.repo}`);
@@ -127,7 +128,7 @@ test('preview reports per-file line counts; binary is null; unicode paths keep c
 
 test('.zipignore from the target commit adds exclusions but never unblocks', () => {
   const f = fixture();
-  f.write('.zipignore', '﻿# comment\r\nassets/*.map\r\n\r\n/build/\r\n!wp-config.php\r\n');
+  f.write('.zipignore', '\uFEFF# comment\r\nassets/*.map\r\n\r\n/build/\r\n!wp-config.php\r\n');
   f.write('assets/app.js.map', 'x'); f.write('assets/app.js', 'x'); f.write('build/out.js', 'x'); f.write('wp-config.php', 'secret');
   f.git('add', '.'); f.git('commit', '-qm', 'ignore');
   const p = preview(f.request);
@@ -139,6 +140,25 @@ test('.zipignore from the target commit adds exclusions but never unblocks', () 
   const all = preview(f.request);
   assert.equal(all.files.length, 0);
   assert.throws(() => build({ ...all, blocked: [] }, { outputRoot: path.join(f.repo, 'out'), acknowledgeDeletes: true }), /Không có file/);
+});
+
+test('.zipignore "**/" also matches at the root and between segments', () => {
+  const f = fixture();
+  f.write('.zipignore', '**/*.log\na/**/b\n');
+  f.write('debug.log', 'x'); f.write('logs/x.log', 'x'); f.write('a/b', 'x'); f.write('a/x/y/b', 'x'); f.write('ab', 'x');
+  f.git('add', '.'); f.git('commit', '-qm', 'globs');
+  const p = preview(f.request);
+  for (const excluded of ['debug.log', 'logs/x.log', 'a/b', 'a/x/y/b']) assert(p.excluded.includes(excluded), excluded);
+  assert(p.files.some(x => x.path === 'ab'));
+});
+
+test('UTF-16 .zipignore written by Windows PowerShell still applies', () => {
+  const f = fixture();
+  f.write('.zipignore', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('assets/*.map\r\n', 'utf16le')]));
+  f.write('assets/app.js.map', 'x'); f.git('add', '.'); f.git('commit', '-qm', 'utf16');
+  const p = preview(f.request);
+  assert.deepEqual(p.ignoreRules, ['assets/*.map']);
+  assert(p.excluded.includes('assets/app.js.map'));
 });
 
 test('tags lists newest first; history lists builds newest first and skips broken folders', () => {
@@ -154,7 +174,7 @@ test('tags lists newest first; history lists builds newest first and skips broke
   assert.deepEqual(h.map(x => x.dir), [second.dir, first.dir]);
   assert.equal(h[1].files, 3); assert.equal(h[1].tag, '1.1.0'); assert(h[1].zipBytes > 0);
   assert.equal(historyDir(first.dir, out), first.dir);
-  for (const bad of [out, path.join(out, 'prod-crashed'), path.join(first.dir, '..', '..'), 'C:\Windows']) assert.throws(() => historyDir(bad, out), /lịch sử/);
+  for (const bad of [out, path.join(out, 'prod-crashed'), path.join(first.dir, '..', '..'), 'C:\\Windows']) assert.throws(() => historyDir(bad, out), /lịch sử/);
 });
 
 test('every Vietnamese UI string has an English translation', () => {
