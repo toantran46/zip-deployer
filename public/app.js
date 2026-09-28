@@ -108,12 +108,59 @@ function invalidate() {
   preview = null; result = null; lastNotice = null;
   renderEnv(); renderPreview(); renderResult(); renderNotice(); updateButtons();
 }
-async function loadTags() {
-  // Suggestions only: a failure just leaves the datalist empty.
+let refs = [];
+// Suggestions only: a failure leaves the list empty. A late answer for a repo the field no longer shows is dropped.
+async function loadRefs({ showErrors = false } = {}) {
   const repo = $('repo').value.trim();
-  let tags = [];
-  if (repo) try { tags = (await api('tags', { repo })).tags; } catch {}
-  $('tag-options').replaceChildren(...tags.map(tag => { const option = el('option'); option.value = tag; return option; }));
+  refs = [];
+  if (!repo) return;
+  try { const data = await api('refs', { repo }); if ($('repo').value.trim() === repo) refs = data.refs; }
+  catch (e) { if (showErrors) notice(e.message, true); }
+}
+const kindLabel = kind => kind === 'branch' ? t('nhánh') : kind === 'remote' ? t('nhánh remote') : t('tag');
+// ARIA combobox over `refs`: names starting with the query first, then other matches, newest first within each.
+function combobox(input) {
+  const list = $(`${input.id}-list`);
+  let count = 0, active = -1;
+  const setActive = i => {
+    active = i;
+    [...list.children].forEach((li, n) => li.setAttribute('aria-selected', n === i));
+    if (i < 0) input.removeAttribute('aria-activedescendant');
+    else { input.setAttribute('aria-activedescendant', list.children[i].id); list.children[i].scrollIntoView({ block: 'nearest' }); }
+  };
+  const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); setActive(-1); };
+  const open = () => {
+    const q = input.value.trim().toLowerCase(), starts = r => r.name.toLowerCase().startsWith(q);
+    const hits = refs.filter(r => r.name.toLowerCase().includes(q));
+    const shown = [...hits.filter(starts), ...hits.filter(r => !starts(r))].slice(0, 50);
+    count = shown.length;
+    if (!count) return close();
+    list.replaceChildren(...shown.map((r, i) => {
+      const li = el('li'), name = el('span', 'combo-name'), at = r.name.toLowerCase().indexOf(q);
+      li.id = `${input.id}-opt-${i}`; li.setAttribute('role', 'option'); li.dataset.name = r.name;
+      name.append(r.name.slice(0, at), el('strong', '', r.name.slice(at, at + q.length)), r.name.slice(at + q.length));
+      li.append(name, el('span', 'combo-kind', kindLabel(r.kind)));
+      return li;
+    }));
+    list.style.top = `${input.offsetTop + input.offsetHeight + 4}px`;
+    list.hidden = false; input.setAttribute('aria-expanded', 'true'); setActive(-1);
+  };
+  const pick = li => { input.value = li.dataset.name; close(); invalidate(); };
+  input.addEventListener('focus', open);
+  input.addEventListener('input', open);
+  input.addEventListener('blur', close);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (list.hidden) open();
+      if (!count) return;
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      setActive(active < 0 ? (step > 0 ? 0 : count - 1) : (active + step + count) % count);
+    } else if (e.key === 'Enter' && !list.hidden && active >= 0) { e.preventDefault(); pick(list.children[active]); }
+    else if (e.key === 'Escape' && !list.hidden) { e.preventDefault(); close(); }
+    else if (e.key === 'Tab') close();
+  });
+  list.addEventListener('mousedown', e => { e.preventDefault(); const li = e.target.closest('li'); if (li) pick(li); });
 }
 let builds = null;
 function historyRow(build) {
@@ -185,7 +232,8 @@ $('download').onclick = () => work('Đang chuẩn bị tải ZIP…', async () =
 });
 $('publish').onclick = () => work('Đang tạo / kiểm tra và push tag…', async () => { const data = await api('publish', { id: result.id, confirmTag: result.tag }); $('publish-ack').checked = false; notice(data.message); });
 $('shutdown').onclick = () => work('Đang dừng app…', async () => { const data = await api('shutdown', {}); stopped = true; notice(data.message); });
-$('repo').addEventListener('change', loadTags);
+$('repo').addEventListener('change', () => loadRefs());
+combobox($('base')); combobox($('target'));
 $('history-open').onclick = async () => {
   try { builds = (await api('history')).builds; renderHistory(); $('history-dialog').showModal(); } catch (e) { notice(e.message, true); }
 };
@@ -198,4 +246,4 @@ $('lang-en').onclick = () => setLang('en');
 applyTheme(store.get('zd-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 lang = store.get('zd-lang') === 'en' ? 'en' : 'vi';
 invalidate(); applyLang();
-api('context').then(data => { $('repo').value = data.repo || ''; renderHeader(); loadTags(); }).catch(e => notice('Không kết nối được app: {error}', true, { error: e.message }));
+api('context').then(data => { $('repo').value = data.repo || ''; renderHeader(); loadRefs(); }).catch(e => notice('Không kết nối được app: {error}', true, { error: e.message }));

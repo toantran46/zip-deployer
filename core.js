@@ -43,7 +43,13 @@ function repoRoot(repo) {
   if (typeof repo !== 'string' || !path.isAbsolute(repo)) throw new Error('Nhập đường dẫn tuyệt đối đến repository.');
   return git(repo, ['rev-parse', '--show-toplevel']).trim();
 }
-function tags(repo) { return git(repoRoot(repo), ['tag', '--list', '--sort=-creatordate']).split('\n').filter(Boolean).slice(0, 20); }
+const REF_KINDS = { heads: 'branch', remotes: 'remote', tags: 'tag' };
+function refs(repo) {
+  return git(repoRoot(repo), ['for-each-ref', '--sort=-creatordate', '--count=1000', '--format=%(refname)%09%(refname:short)%09%(symref)', 'refs/heads', 'refs/remotes', 'refs/tags'])
+    .split('\n').filter(Boolean).map(line => line.split('\t'))
+    .filter(([, , symref]) => !symref) // origin/HEAD
+    .map(([full, name]) => ({ name, kind: REF_KINDS[full.split('/')[1]] }));
+}
 // ponytail: reads every manifest per call; add an index file if output/ grows to thousands of builds.
 function history(outputRoot = OUTPUT_ROOT) {
   if (!fs.existsSync(outputRoot)) return [];
@@ -147,4 +153,4 @@ function publish(result) {
   catch (e) { throw new Error(`Tag local đã tồn tại; push chưa thành công. Có thể thử lại, không cần tạo lại ZIP. ${e.message}`); }
   return { message: `Đã push tag ${result.tag} lên origin. Chưa upload hoặc deploy.` };
 }
-module.exports = { preview, build, publish, tags, history, historyDir, OUTPUT_ROOT };
+module.exports = { preview, build, publish, refs, history, historyDir, OUTPUT_ROOT };

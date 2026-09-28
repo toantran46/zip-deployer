@@ -34,7 +34,7 @@ function createServer(defaultRepo = '', { outputRoot } = {}) {
         res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${currentBuild.zipName}"` });
         return fs.createReadStream(currentBuild.zipPath).pipe(res);
       }
-      if (req.method !== 'POST' || !['/api/preview', '/api/build', '/api/publish', '/api/reveal', '/api/tags', '/api/shutdown'].includes(req.url)) return json(404, { error: 'Không tìm thấy thao tác.' });
+      if (req.method !== 'POST' || !['/api/preview', '/api/build', '/api/publish', '/api/reveal', '/api/refs', '/api/shutdown'].includes(req.url)) return json(404, { error: 'Không tìm thấy thao tác.' });
       if (!String(req.headers['content-type']).startsWith('application/json')) return json(415, { error: 'Yêu cầu JSON.' });
       let raw = '';
       for await (const chunk of req) { raw += chunk; if (raw.length > 16384) throw new Error('Yêu cầu quá lớn.'); }
@@ -52,7 +52,7 @@ function createServer(defaultRepo = '', { outputRoot } = {}) {
         if (!currentBuild || body.id !== currentBuild.id || body.confirmTag !== currentBuild.tag) throw new Error('Xác nhận đúng tag của ZIP đã tạo.');
         return json(200, core.publish(currentBuild));
       }
-      if (req.url === '/api/tags') return json(200, { tags: core.tags(body.repo) });
+      if (req.url === '/api/refs') return json(200, { refs: core.refs(body.repo) });
       if (req.url === '/api/reveal') {
         // Only the current build or a folder listed in deploy history can be opened.
         const dir = body.dir ? core.historyDir(body.dir, outputRoot) : currentBuild?.dir;

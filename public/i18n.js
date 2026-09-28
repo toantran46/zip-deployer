@@ -130,5 +130,9 @@ const EN = {
   "Đường dẫn không an toàn trên Windows": "Path is unsafe on Windows",
   "File nhạy cảm hoặc dữ liệu không được đóng gói": "Sensitive file or data that must not be packaged",
   "Không tạo được thư mục kết quả mới.": "Couldn't create a new output folder.",
+  "nhánh": "branch",
+  "nhánh remote": "remote",
+  "tag": "tag",
+  "Gợi ý branch / tag": "Branch / tag suggestions",
 };
 if (typeof module !== 'undefined') module.exports = EN;
