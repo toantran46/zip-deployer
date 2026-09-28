@@ -36,7 +36,7 @@ The app is offline and the CSP forbids external fonts, so it uses system stacks 
 - Hierarchy comes from weight and color, not size jumps. Do not use Inter or serif fonts.
 
 ## 4. Component Stylings
-- **Header (sticky, 72px, `--surface`, bottom line):** brand mark, a "Zip Deployer" wordmark and a mint "DEPLOY STUDIO"-style pill. Then a divider and the repo badge: a green dot plus mono `repo / target @ sha8`, or only the repo folder name before a preview. On the right: ghost buttons "Lịch sử deploy" and ".zipignore", a VI|EN segmented control, a theme icon button and the existing "Dừng app" text button.
+- **Header (sticky, 72px, `--surface`, bottom line):** brand mark, a "Zip Deployer" wordmark and a mint "DEPLOY STUDIO"-style pill. Then a divider and the repo badge: a green dot plus mono `repo / target @ sha8`, or only the repo folder name before a preview. On the right: ghost buttons "Lịch sử deploy" and ".zipignore", a VI|EN segmented control, a System|Light|Dark segmented control (icon plus label; System is the default and follows Windows live) and the existing "Dừng app" text button. Both segmented controls share the `.switch` style: `--surface-2` track, active segment `--surface` with `--accent` text.
 - **Hero row:** H1 "Từ commit đến gói deploy." with a one-line subtitle on the left and the mono workflow chip "Git → Kiểm tra → Đóng gói ZIP" on the right. It is left-aligned, never centered.
 - **Production banner:** full width, `--warn-soft` bg, `--warn-line` border, radius 12px, shield tile and bold amber lead "CHẾ ĐỘ PRODUCTION (TRỰC TIẾP):". It is shown only while production is selected.
 - **Notice:** a full-width strip with a check or alert tile. Success uses mint colors, errors use danger-soft colors.

@@ -195,7 +195,13 @@ function applyLang() {
   if ($('rules-dialog').open) renderRules();
 }
 function setLang(code) { lang = code; store.set('zd-lang', code); applyLang(); }
-function applyTheme(theme) { document.documentElement.dataset.theme = theme; $('theme-toggle').setAttribute('aria-pressed', theme === 'dark'); }
+const THEMES = ['system', 'light', 'dark'];
+// "system" drops data-theme so the CSS prefers-color-scheme block follows Windows live.
+function applyTheme(mode) {
+  if (!THEMES.includes(mode)) mode = 'system';
+  if (mode === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = mode;
+  for (const m of THEMES) $(`theme-${m}`).setAttribute('aria-pressed', m === mode);
+}
 
 $('release-form').addEventListener('input', invalidate);
 $('release-form').addEventListener('submit', e => {
@@ -244,12 +250,12 @@ $('history-open').onclick = async () => {
   try { builds = (await api('history')).builds; renderHistory(); $('history-dialog').showModal(); } catch (e) { notice(e.message, true); }
 };
 $('rules-open').onclick = () => { renderRules(); $('rules-dialog').showModal(); };
-$('theme-toggle').onclick = () => { const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; store.set('zd-theme', next); applyTheme(next); };
+for (const m of THEMES) $(`theme-${m}`).onclick = () => { store.set('zd-theme', m); applyTheme(m); };
 
 $('lang-vi').onclick = () => setLang('vi');
 $('lang-en').onclick = () => setLang('en');
 
-applyTheme(store.get('zd-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+applyTheme(store.get('zd-theme'));
 lang = store.get('zd-lang') === 'en' ? 'en' : 'vi';
 invalidate(); applyLang();
 api('context').then(data => { $('repo').value = data.repo || ''; renderHeader(); loadRefs(); }).catch(e => notice('Không kết nối được app: {error}', true, { error: e.message }));
