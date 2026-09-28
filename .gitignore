@@ -1,0 +1,32 @@
+# Generated build results (ZIP packages, manifests contain local absolute paths)
+output/
+# Runtime state: running instance URL/PID and server logs
+runtime/
+*.log
+
+# Dependencies (app uses Node built-ins only, kept in case tooling is added)
+node_modules/
+
+# Secrets and local environment
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Deploy artifacts and temp dirs
+*.zip
+.deploy-temp/
+
+# Claude Code: personal/local settings (shared .claude/settings.json is committed)
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
