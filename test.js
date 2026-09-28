@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { preview, build, publish, tags, history, historyDir } = require('./core');
+const { preview, build, publish, refs, history, historyDir } = require('./core');
 
 function fixture() {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-helper-test-'));
@@ -94,7 +94,8 @@ test('HTTP server protects operations and completes preview/build/download witho
   const download = await fetch(url + '/api/download', { headers });
   assert.equal(download.status, 200);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), fs.readFileSync(output.zipPath));
-  assert.deepEqual((await (await post('tags', { repo: f.repo })).json()).tags, ['1.0.0']);
+  assert.deepEqual((await (await post('refs', { repo: f.repo })).json()).refs.filter(r => r.kind === 'tag').map(r => r.name), ['1.0.0']);
+  assert.equal((await post('tags', { repo: f.repo })).status, 404);
   assert.equal(path.dirname(output.dir), outputRoot); // tests never write into the real output/ history
   assert.deepEqual((await (await fetch(url + '/api/history', { headers })).json()).builds.map(x => x.dir), [output.dir]);
   assert.equal((await post('reveal', { dir: 'C:\\Windows' })).status, 400);
@@ -161,10 +162,52 @@ test('UTF-16 .zipignore written by Windows PowerShell still applies', () => {
   assert(p.excluded.includes('assets/app.js.map'));
 });
 
-test('tags lists newest first; history lists builds newest first and skips broken folders', () => {
-  const f = fixture(); f.git('tag', '1.0.1');
-  assert.deepEqual(tags(f.repo).slice(0, 2).sort(), ['1.0.0', '1.0.1']);
-  assert.throws(() => tags('relative/path'), /tuyệt đối/);
+test('build folders are named env-label-date-time and never reuse an existing folder', () => {
+  const f = fixture(); const out = path.join(f.repo, 'out');
+  const now = new Date(2026, 8, 29, 14, 30, 12);
+  const opts = { outputRoot: out, acknowledgeDeletes: true, now };
+  const first = build(preview(f.request), opts);
+  const second = build(preview(f.request), opts);
+  assert.equal(path.basename(first.dir), 'prod-1.1.0-20260929-1430');
+  assert.equal(path.basename(second.dir), 'prod-1.1.0-20260929-1430-2');
+  assert.equal(first.createdAt, now.toISOString());
+  f.git('branch', 'feature/ABC-12_x');
+  const staging = build(preview({ ...f.request, environment: 'staging', target: 'feature/ABC-12_x' }), opts);
+  assert.equal(path.basename(staging.dir), 'staging-feature-ABC-12_x-20260929-1430');
+  const legacy = path.join(out, 'prod-lbqZDC'); fs.mkdirSync(legacy);
+  fs.writeFileSync(path.join(legacy, 'manifest.json'), JSON.stringify({ ...first, dir: legacy }));
+  assert.deepEqual(history(out).map(x => path.basename(x.dir)).sort(),
+    ['prod-1.1.0-20260929-1430', 'prod-1.1.0-20260929-1430-2', 'prod-lbqZDC', 'staging-feature-ABC-12_x-20260929-1430']);
+});
+
+test('long labels are cut to 40 characters in the folder name but kept whole in the ZIP name', () => {
+  // Windows' 260-character path limit applies to output\<dir>\files\<repo path> in zip.ps1.
+  const f = fixture(); const long = 'feature/' + 'x'.repeat(60); f.git('branch', long);
+  const built = build(preview({ ...f.request, environment: 'staging', target: long }), { outputRoot: path.join(f.repo, 'out'), acknowledgeDeletes: true, now: new Date(2026, 8, 29, 14, 30) });
+  assert.equal(path.basename(built.dir), `staging-feature-${'x'.repeat(32)}-20260929-1430`);
+  assert.equal(built.zipName, `deploy-staging-feature-${'x'.repeat(60)}.zip`);
+});
+
+test('refs lists branches, remote branches and tags, skips origin/HEAD, and every name resolves', () => {
+  const f = fixture(); const branch = f.git('branch', '--show-current').trim();
+  const remote = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-helper-remote-'));
+  execFileSync('git', ['init', '--bare', '-q', remote], { windowsHide: true });
+  f.git('remote', 'add', 'origin', remote); f.git('push', '-q', 'origin', branch);
+  f.git('fetch', '-q', 'origin'); f.git('remote', 'set-head', 'origin', branch);
+  f.git('branch', 'dup'); f.git('tag', 'dup', '1.0.0');
+  const list = refs(f.repo); const kind = Object.fromEntries(list.map(r => [r.name, r.kind]));
+  assert.equal(kind[branch], 'branch'); assert.equal(kind[`origin/${branch}`], 'remote'); assert.equal(kind['1.0.0'], 'tag');
+  assert(!list.some(r => r.name === 'origin/HEAD' || r.name === 'origin'));
+  assert.deepEqual(list.filter(r => /dup$/.test(r.name)).map(r => r.kind).sort(), ['branch', 'tag']);
+  for (const r of list) f.git('rev-parse', '--verify', '--end-of-options', `${r.name}^{commit}`);
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-helper-empty-'));
+  execFileSync('git', ['init', '-q', empty], { windowsHide: true });
+  assert.deepEqual(refs(empty), []);
+  assert.throws(() => refs('relative/path'), /tuyệt đối/);
+});
+
+test('history lists builds newest first and skips broken folders', () => {
+  const f = fixture();
   const out = path.join(f.repo, 'out');
   const first = build(preview(f.request), { outputRoot: out, acknowledgeDeletes: true });
   const second = build(preview({ ...f.request, environment: 'staging' }), { outputRoot: out, acknowledgeDeletes: true });

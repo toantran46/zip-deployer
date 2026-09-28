@@ -36,14 +36,15 @@ The app is offline and the CSP forbids external fonts, so it uses system stacks 
 - Hierarchy comes from weight and color, not size jumps. Do not use Inter or serif fonts.
 
 ## 4. Component Stylings
-- **Header (sticky, 72px, `--surface`, bottom line):** brand mark, a "Zip Deployer" wordmark and a mint "DEPLOY STUDIO"-style pill. Then a divider and the repo badge: a green dot plus mono `repo / target @ sha8`, or only the repo folder name before a preview. On the right: ghost buttons "Lịch sử deploy" and ".zipignore", a VI|EN segmented control, a theme icon button and the existing "Dừng app" text button.
+- **Header (sticky, 72px, `--surface`, bottom line):** brand mark, a "Zip Deployer" wordmark and a mint "DEPLOY STUDIO"-style pill. Then a divider and the repo badge: a green dot plus mono `repo / target @ sha8`, or only the repo folder name before a preview. On the right: ghost buttons "Lịch sử deploy" and ".zipignore", a VI|EN segmented control, a System|Light|Dark segmented control (icon plus label; System is the default and follows Windows live) and the existing "Dừng app" text button. Both segmented controls share the `.switch` style: `--surface-2` track, active segment `--surface` with `--accent` text.
 - **Hero row:** H1 "Từ commit đến gói deploy." with a one-line subtitle on the left and the mono workflow chip "Git → Kiểm tra → Đóng gói ZIP" on the right. It is left-aligned, never centered.
 - **Production banner:** full width, `--warn-soft` bg, `--warn-line` border, radius 12px, shield tile and bold amber lead "CHẾ ĐỘ PRODUCTION (TRỰC TIẾP):". It is shown only while production is selected.
 - **Notice:** a full-width strip with a check or alert tile. Success uses mint colors, errors use danger-soft colors.
 - **Cards:** `--surface`, 1px `--line`, radius 16px, no shadow in dark mode and at most `0 1px 2px rgb(15 23 42 / .04)` in light mode. The card header has a step chip (`01`/`02` mono on `--surface-2`), a title and a right-side meta item, followed by a bottom line.
 - **Segmented env control:** track `--surface-2`, radius 12px. The active pill is `--surface` with a colored dot (staging uses `--accent`, production uses `--warn`), and the active production pill gets a `--warn-line` border.
-- **Inputs:** 40px high, radius 10px, 1px `--line` and mono value text. The label sits above and the helper text below in `--muted`. Focus shows a 2px `--accent` outline. The production tag input uses a `--warn-line` border and a "PRODUCTION" micro-badge beside its label.
-- **Buttons:** radius 10px, 40px high, 600 weight. Primary uses `--accent` with white text. In production the preview button is Ink (`--text` bg, `--surface` text) so the two environments look different. Secondary is `--surface` with a 1px line. Active state is `translateY(1px)`. There are no glows.
+- **Inputs:** 40px high, radius 10px, 1px `--line` and mono value text. The label sits above and the helper text below in `--muted`. Focus shows a 2px `--accent` outline. The production tag input uses a `--warn-line` border and a "PRODUCTION" micro-badge beside its label. The repository input shares its row with a secondary **Browse…** button (8px gap) that opens the native Windows "Select folder" dialog.
+- **Ref combobox (Base / Target):** a popup 4px under the input with `--surface`, a 1px `--line` border, radius 10px and `--shadow-pop` (the only floating shadow). Rows are mono 13px with the matched part bold and a muted 11px kind label (branch / remote / tag) on the right. The active and hovered row uses `--accent-soft` with `--accent` text. At most 50 rows; the list scrolls past 320px.
+- **Buttons:** radius 10px, 40px high, 600 weight. Primary uses `--accent` with white text. Production uses the same primary button; the amber banner, env pill, tag field and LIVE chip already mark the environment. Secondary is `--surface` with a 1px line. Active state is `translateY(1px)`. There are no glows.
 - **Stat tiles (3 in a row inside the review card, not page-level cards):** `--surface-2` with a 1px line, a big 26px number, a muted caption, and an icon tile at the right in mint, amber or slate.
 - **Filter tabs:** text tabs "Tất cả (n) / Chỉnh sửa (n) / Thêm mới (n) / Đã xóa (n)". The active tab is `--surface` with a 1px line. A search input sits on the right.
 - **File rows:** a 28px square status badge (M uses the amber palette, A the mint palette, D the danger palette), then the path in mono with the directory in `--muted` and the basename bold. The second line is mono `+N dòng • −N dòng` in `--add` / `--danger`, or `binary` in muted. Rows are separated by 1px lines and no cards.
@@ -64,7 +65,7 @@ The app is offline and the CSP forbids external fonts, so it uses system stacks 
 No emojis, no Inter, no serif, no pure black, no neon or outer glows, no gradient text, no custom cursors, no inline `style=""` attributes (the CSP forbids them), no external fonts or CDNs, no fake numbers (a size appears only after a real build), no decorative checkboxes that do nothing (Stitch's "backup commit", "rollback script", "deploy checklist log" and "PHP lint" options are dropped), and no AI copy clichés ("zero-risk", "seamless", "guarantee").
 
 ## 8. Copy (VI → EN)
-Vietnamese is the default. EN comes from the Stitch bilingual spec, toned down where it overclaims.
+English is the default; VI is one click away and the choice is remembered. Source strings stay Vietnamese and EN comes from the Stitch bilingual spec, toned down where it overclaims.
 
 | VI | EN |
 |---|---|
