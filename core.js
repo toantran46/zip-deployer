@@ -95,16 +95,26 @@ function preview(input) {
     names.add(key); files.push({ path: p, status, oid: entry.oid, ...counts.get(p) });
   }
   const label = (tag || input.target).replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 70) || targetSha.slice(0, 8);
-  return { id: crypto.randomUUID(), repo, base: input.base, target: input.target, baseSha, targetSha, environment: input.environment, tag, files, deleted, blocked, excluded: omitted, ignoreRules: ignore.rules, zipName: `deploy-${input.environment}-${label}.zip`, dirty: Boolean(git(repo, ['status', '--porcelain', '--untracked-files=no']).trim()) };
+  return { id: crypto.randomUUID(), repo, base: input.base, target: input.target, baseSha, targetSha, environment: input.environment, tag, files, deleted, blocked, excluded: omitted, ignoreRules: ignore.rules, label, zipName: `deploy-${input.environment}-${label}.zip`, dirty: Boolean(git(repo, ['status', '--porcelain', '--untracked-files=no']).trim()) };
+}
+const pad = n => String(n).padStart(2, '0');
+const stamp = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+// Never reuses a folder: an existing name gets -2, -3, ...
+function newOutputDir(root, name) {
+  for (let n = 1; n < 100; n++) {
+    const dir = path.join(root, n === 1 ? name : `${name}-${n}`);
+    try { fs.mkdirSync(dir); return dir; } catch (e) { if (e.code !== 'EEXIST') throw e; }
+  }
+  throw new Error('Không tạo được thư mục kết quả mới.');
 }
 function build(p, options = {}) {
   if (p.blocked.length) throw new Error('Có file nhạy cảm hoặc không an toàn. Hãy sửa phạm vi commit trước khi đóng gói.');
   if (p.deleted.length && !options.acknowledgeDeletes) throw new Error('Cần xác nhận xử lý file xóa trên hosting.');
   if (!p.files.length) throw new Error('Không có file thêm/sửa để đóng ZIP.');
   if (p.tag) tagCheck(p.repo, p.tag, p.targetSha);
-  const outputRoot = options.outputRoot || OUTPUT_ROOT;
+  const outputRoot = options.outputRoot || OUTPUT_ROOT, now = options.now || new Date();
   fs.mkdirSync(outputRoot, { recursive: true });
-  const dir = fs.mkdtempSync(path.join(outputRoot, `${p.environment}-`));
+  const dir = newOutputDir(outputRoot, `${p.environment}-${p.label}-${stamp(now)}`);
   const stage = path.join(dir, 'files'); fs.mkdirSync(stage);
   const files = p.files.map(file => {
     const content = git(p.repo, ['cat-file', 'blob', file.oid], true);
@@ -113,7 +123,7 @@ function build(p, options = {}) {
     return { path: file.path, size: content.length, sha256: crypto.createHash('sha256').update(content).digest('hex') };
   });
   const zipPath = path.join(dir, p.zipName), verification = path.join(dir, 'verification.json');
-  const result = { ...p, dir, zipPath, files, createdAt: new Date().toISOString() };
+  const result = { ...p, dir, zipPath, files, createdAt: now.toISOString() };
   try {
     execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'zip.ps1'), '-Source', stage, '-Destination', zipPath, '-Report', verification], { windowsHide: true, timeout: 300000, stdio: 'pipe' });
     let actual = JSON.parse(fs.readFileSync(verification, 'utf8').replace(/^\uFEFF/, ''));

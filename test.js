@@ -161,6 +161,24 @@ test('UTF-16 .zipignore written by Windows PowerShell still applies', () => {
   assert(p.excluded.includes('assets/app.js.map'));
 });
 
+test('build folders are named env-label-date-time and never reuse an existing folder', () => {
+  const f = fixture(); const out = path.join(f.repo, 'out');
+  const now = new Date(2026, 8, 29, 14, 30, 12);
+  const opts = { outputRoot: out, acknowledgeDeletes: true, now };
+  const first = build(preview(f.request), opts);
+  const second = build(preview(f.request), opts);
+  assert.equal(path.basename(first.dir), 'prod-1.1.0-20260929-1430');
+  assert.equal(path.basename(second.dir), 'prod-1.1.0-20260929-1430-2');
+  assert.equal(first.createdAt, now.toISOString());
+  f.git('branch', 'feature/ABC-12_x');
+  const staging = build(preview({ ...f.request, environment: 'staging', target: 'feature/ABC-12_x' }), opts);
+  assert.equal(path.basename(staging.dir), 'staging-feature-ABC-12_x-20260929-1430');
+  const legacy = path.join(out, 'prod-lbqZDC'); fs.mkdirSync(legacy);
+  fs.writeFileSync(path.join(legacy, 'manifest.json'), JSON.stringify({ ...first, dir: legacy }));
+  assert.deepEqual(history(out).map(x => path.basename(x.dir)).sort(),
+    ['prod-1.1.0-20260929-1430', 'prod-1.1.0-20260929-1430-2', 'prod-lbqZDC', 'staging-feature-ABC-12_x-20260929-1430']);
+});
+
 test('tags lists newest first; history lists builds newest first and skips broken folders', () => {
   const f = fixture(); f.git('tag', '1.0.1');
   assert.deepEqual(tags(f.repo).slice(0, 2).sort(), ['1.0.0', '1.0.1']);
