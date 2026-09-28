@@ -157,6 +157,7 @@ function combobox(input) {
       const step = e.key === 'ArrowDown' ? 1 : -1;
       setActive(active < 0 ? (step > 0 ? 0 : count - 1) : (active + step + count) % count);
     } else if (e.key === 'Enter' && !list.hidden && active >= 0) { e.preventDefault(); pick(list.children[active]); }
+    else if (e.key === 'Enter') close(); // the form submits; work() disables the input without a blur
     else if (e.key === 'Escape' && !list.hidden) { e.preventDefault(); close(); }
     else if (e.key === 'Tab') close();
   });
