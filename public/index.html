@@ -6,47 +6,92 @@
   <title>Zip Deployer</title>
   <link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script>
 </head>
-<body>
-  <header class="topbar"><a class="brand" href="/" aria-label="Zip Deployer"><span class="brand-mark">Z</span><strong>Zip Deployer</strong></a><div class="top-actions"><span class="local-label">Chạy trên máy của bạn</span><button id="shutdown" class="text-button">Dừng app</button></div></header>
+<body data-env="staging">
+  <header class="topbar">
+    <div class="topbar-left">
+      <a class="brand" href="/" aria-label="Zip Deployer"><span class="brand-mark">Z</span><strong>Zip Deployer</strong><span class="brand-pill">Deploy studio</span></a>
+      <span class="topbar-divider" aria-hidden="true"></span>
+      <span id="repo-badge" class="repo-badge" hidden><span class="dot" aria-hidden="true"></span><code id="repo-badge-text"></code></span>
+    </div>
+    <div class="topbar-actions">
+      <button id="history-open" class="ghost-button" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-i18n>Lịch sử deploy</span></button>
+      <button id="rules-open" class="ghost-button" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span>.zipignore</span></button>
+      <div class="lang-switch" role="group" aria-label="Ngôn ngữ"><button id="lang-vi" type="button" aria-pressed="true">VI</button><button id="lang-en" type="button" aria-pressed="false">EN</button></div>
+      <button id="theme-toggle" class="icon-button" type="button" aria-label="Đổi giao diện sáng / tối"><svg class="icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+      <button id="shutdown" class="text-button" type="button"><span data-i18n>Dừng app</span></button>
+    </div>
+  </header>
   <main>
-    <div class="page-heading"><div><h1>Từ commit đến gói deploy.</h1><p>Chọn phiên bản, kiểm tra thay đổi và tạo ZIP sẵn sàng upload.</p></div><span class="workflow-note">Git → Kiểm tra → ZIP</span></div>
-    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section class="hero">
+      <div><h1 data-i18n>Từ commit đến gói deploy.</h1><p data-i18n>Chọn phiên bản, kiểm tra thay đổi và tạo ZIP sẵn sàng upload.</p></div>
+      <span class="workflow-chip"><b>Git</b> → <b data-i18n>Kiểm tra</b> → <b data-i18n>Đóng gói ZIP</b></span>
+    </section>
+    <div id="prod-banner" class="banner" hidden>
+      <span class="banner-tile" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></span>
+      <p><strong data-i18n>Chế độ production (trực tiếp):</strong> <span data-i18n>Bạn đang đóng gói cho môi trường thật. Kiểm tra kỹ tag phát hành và phạm vi commit trước khi tạo ZIP.</span></p>
+      <span class="banner-chip">LIVE</span>
+    </div>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden><p id="notice-text"></p></div>
     <div class="workspace">
-      <section class="setup" aria-labelledby="setup-title">
-        <div class="section-title"><h2 id="setup-title">Thiết lập bản phát hành</h2><span class="step-label">01</span></div>
-        <form id="release-form">
-          <fieldset class="environment"><legend>Môi trường</legend><div class="segmented"><label><input type="radio" name="environment" value="staging" checked><span>Staging</span></label><label><input type="radio" name="environment" value="prod"><span>Production</span></label></div></fieldset>
-          <label class="field">Thư mục repository<input id="repo" required spellcheck="false" autocomplete="off"><span>Đường dẫn thư mục Git trên máy này.</span></label>
-          <div class="version-flow"><label class="field">Phiên bản đang trên hosting<input id="base" required placeholder="Ví dụ: 1.43.0" spellcheck="false" autocomplete="off"><span>Nhập đúng tag hoặc commit đang chạy.</span></label><div class="flow-line" aria-hidden="true">↓</div><label class="field">Branch / tag / commit cần đóng gói<input id="target" required placeholder="Ví dụ: release/1.44.0-rc" spellcheck="false" autocomplete="off"><span>Chỉ lấy nội dung đã commit của phiên bản này.</span></label></div>
-          <label id="tag-field" class="field" hidden>Tag production mới<input id="tag" placeholder="Ví dụ: 1.44.0" spellcheck="false" autocomplete="off"><span>Tag chưa tồn tại sẽ chỉ được tạo khi bạn chọn “Tạo & push tag”.</span></label>
-          <button id="preview-button" class="button primary full" type="submit">Xem trước thay đổi <span aria-hidden="true">→</span></button>
+      <section class="card" aria-labelledby="setup-title">
+        <div class="card-head"><span class="step">01</span><h2 id="setup-title" data-i18n>Thiết lập bản phát hành</h2><span class="card-meta" data-i18n>Cấu hình Git source</span></div>
+        <form id="release-form" class="card-body">
+          <fieldset><legend class="label" data-i18n>Môi trường triển khai</legend>
+            <div class="segmented"><label><input type="radio" name="environment" value="staging" checked><span class="seg staging"><span data-i18n>Staging (Thử nghiệm)</span></span></label><label><input type="radio" name="environment" value="prod"><span class="seg prod"><span data-i18n>Production (Trực tiếp)</span></span></label></div>
+          </fieldset>
+          <label class="field"><span class="field-row"><span class="field-label" data-i18n>Thư mục repository Git</span></span><input id="repo" required spellcheck="false" autocomplete="off"><span class="help" data-i18n>Đường dẫn thư mục Git trên máy này.</span></label>
+          <div class="diff-box">
+            <div class="diff-head"><span class="label" data-i18n>So sánh thay đổi (Git diff)</span><code id="tree-state" class="hint"></code></div>
+            <label class="field"><span class="field-row"><span class="field-label" data-i18n>Phiên bản đang trên hosting (Base)</span><code id="base-hint" class="hint"></code></span><input id="base" list="tag-options" required placeholder="Ví dụ: 1.43.0" spellcheck="false" autocomplete="off"><span class="help" data-i18n>Nhập đúng tag hoặc commit đang chạy.</span></label>
+            <datalist id="tag-options"></datalist>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <label class="field"><span class="field-row"><span class="field-label" data-i18n>Branch / tag / commit cần đóng gói (Target)</span><code id="target-hint" class="hint"></code></span><input id="target" required placeholder="Ví dụ: release/1.44.0-rc" spellcheck="false" autocomplete="off"><span class="help" data-i18n>Chỉ lấy nội dung đã commit của phiên bản này.</span></label>
+            <label id="tag-field" class="field tag-field" hidden><span class="field-row"><span class="field-label" data-i18n>Tag production mới</span><span class="micro-badge">PRODUCTION</span></span><input id="tag" placeholder="Ví dụ: 1.44.0" spellcheck="false" autocomplete="off"><span class="help" data-i18n>Tag chưa tồn tại sẽ chỉ được tạo khi bạn chọn “Tạo & push tag”.</span></label>
+            <button id="preview-button" class="button primary full" type="submit"><span data-i18n>Xem trước thay đổi</span> <span aria-hidden="true">→</span></button>
+          </div>
         </form>
-        <div class="setup-footnote"><strong>Đúng phiên bản bạn chọn.</strong><p>File đang sửa chưa commit không đi vào ZIP. App không upload hoặc giải nén trên hosting.</p></div>
+        <div class="footnote">
+          <span class="footnote-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <div><strong data-i18n>Đúng phiên bản bạn chọn.</strong><p data-i18n>File đang sửa chưa commit không đi vào ZIP. App không upload hoặc giải nén trên hosting.</p></div>
+        </div>
       </section>
-      <section class="review" aria-labelledby="review-title">
-        <div class="section-title"><h2 id="review-title">Kiểm tra gói deploy</h2><span class="step-label">02</span></div>
-        <div id="empty" class="empty"><div class="empty-symbol" aria-hidden="true">↗</div><h3>Một lần kiểm tra. Một file ZIP.</h3><p>Chọn hai phiên bản để xem những file sẽ được cập nhật trên hosting.</p><div class="empty-checks"><span>Nội dung từ Git</span><span>Đường dẫn chuẩn /</span><span>Kiểm tra file nhạy cảm</span></div></div>
+      <section class="card" aria-labelledby="review-title">
+        <div class="card-head"><span class="step">02</span><h2 id="review-title" data-i18n>Kiểm tra gói deploy</h2><span class="card-meta-group"><span id="environment-badge" class="badge" hidden></span><code id="commit-range" class="chip" hidden></code></span></div>
+        <div id="empty" class="empty"><div class="empty-symbol" aria-hidden="true">↗</div><h3 data-i18n>Một lần kiểm tra. Một file ZIP.</h3><p data-i18n>Chọn hai phiên bản để xem những file sẽ được cập nhật trên hosting.</p><div class="empty-checks"><span data-i18n>Nội dung từ Git</span><span data-i18n>Đường dẫn chuẩn /</span><span data-i18n>Kiểm tra file nhạy cảm</span></div></div>
         <div id="preview" hidden>
-          <div class="commit-strip"><span id="environment-badge" class="badge"></span><code id="commit-range"></code><span id="dirty" hidden>Có thay đổi chưa commit</span></div>
-          <div class="stats"><div><strong id="file-count">0</strong><span>file đóng gói</span></div><div><strong id="delete-count">0</strong><span>file cần xóa</span></div><div><strong id="blocked-count">0</strong><span>file bị chặn</span></div></div>
-          <div id="blocked-box" class="callout danger" hidden><strong>Chưa thể đóng gói</strong><p>Danh sách có file nhạy cảm hoặc không được hỗ trợ. Hãy chọn lại phạm vi commit.</p><ul id="blocked-list"></ul></div>
-          <div class="file-toolbar"><h3>File thêm và cập nhật</h3><label class="search-label"><span class="sr-only">Tìm đường dẫn file</span><input id="filter" type="search" placeholder="Lọc đường dẫn…"></label></div>
+          <div class="stats">
+            <div class="stat"><div><strong id="file-count">0</strong><span class="stat-caption" data-i18n>file đóng gói</span></div><span class="stat-icon ok" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/></svg></span></div>
+            <div class="stat"><div><strong id="delete-count">0</strong><span class="stat-caption" data-i18n>file cần xóa</span></div><span class="stat-icon warn" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></span></div>
+            <div class="stat"><div><strong id="blocked-count">0</strong><span class="stat-caption" data-i18n>file bị chặn</span></div><span class="stat-icon muted" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M5 5l14 14"/></svg></span></div>
+          </div>
+          <div id="blocked-box" class="callout" hidden><strong data-i18n>Chưa thể đóng gói</strong><p data-i18n>Danh sách có file nhạy cảm hoặc không được hỗ trợ. Hãy chọn lại phạm vi commit.</p><ul id="blocked-list" class="path-list"></ul></div>
+          <div class="file-toolbar">
+            <div id="filter-tabs" class="tabs" role="tablist" aria-label="Lọc theo trạng thái">
+              <button type="button" role="tab" data-filter="all" aria-selected="true"><span data-i18n>Tất cả</span> <span class="count"></span></button>
+              <button type="button" role="tab" data-filter="M" aria-selected="false"><span data-i18n>Chỉnh sửa</span> <span class="count"></span></button>
+              <button type="button" role="tab" data-filter="A" aria-selected="false"><span data-i18n>Thêm mới</span> <span class="count"></span></button>
+              <button type="button" role="tab" data-filter="D" aria-selected="false"><span data-i18n>Đã xóa</span> <span class="count"></span></button>
+            </div>
+            <label class="search-label"><span class="sr-only" data-i18n>Tìm đường dẫn file</span><input id="filter" type="search" placeholder="Lọc đường dẫn…"></label>
+          </div>
           <div class="file-list" id="file-list" aria-label="Danh sách file"></div>
-          <details id="deleted-box" class="details" hidden><summary>File xóa / đường dẫn cũ khi đổi tên</summary><p>Giải nén ZIP không xóa các đường dẫn này. Kiểm tra và xử lý riêng trên hosting.</p><ul id="deleted-list" class="path-list"></ul></details>
-          <details id="excluded-box" class="details" hidden><summary id="excluded-title"></summary><p>Thư mục docs, tools, tests và cấu hình agent không thuộc gói deploy.</p><ul id="excluded-list" class="path-list"></ul></details>
-          <label id="delete-ack" class="check-row" hidden><input id="ack" type="checkbox"><span>Tôi đã xem danh sách file xóa và sẽ xử lý riêng trên hosting.</span></label>
-          <div class="build-bar"><div><span>Gói sẽ tạo</span><strong id="zip-name"></strong></div><button id="build" class="button primary" disabled>Tạo ZIP <span aria-hidden="true">↓</span></button></div>
+          <details id="excluded-box" class="details" hidden><summary id="excluded-title"></summary><p data-i18n>Thư mục docs, tools, tests, cấu hình agent và đường dẫn khớp .zipignore không thuộc gói deploy.</p><ul id="excluded-list" class="path-list"></ul></details>
+          <label id="delete-ack" class="check-row" hidden><input id="ack" type="checkbox"><span data-i18n>Tôi đã xem các file ở tab “Đã xóa” và sẽ xử lý riêng trên hosting.</span></label>
+          <div class="build-bar">
+            <div class="zip-name"><span class="label" data-i18n>Tên file ZIP sẽ tạo</span><span class="zip-row"><code id="zip-name"></code><button id="zip-copy" class="icon-button small" type="button" aria-label="Chép tên file ZIP"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button></span></div>
+            <button id="build" class="button primary" type="button" disabled><span data-i18n>Tạo ZIP</span> <span aria-hidden="true">↓</span></button>
+          </div>
         </div>
         <section id="result" class="result" aria-labelledby="result-title" hidden>
-          <div class="result-heading"><span class="result-check" aria-hidden="true">✓</span><div><h3 id="result-title">ZIP đã sẵn sàng</h3><p>Đã đọc lại ZIP và đối chiếu SHA-256 từng file.</p></div></div>
+          <div class="result-heading"><span class="result-check" aria-hidden="true">✓</span><div><h3 id="result-title" data-i18n>ZIP đã sẵn sàng</h3><p data-i18n>Đã đọc lại ZIP và đối chiếu SHA-256 từng file.</p></div></div>
           <strong id="result-name" class="result-name"></strong><p id="result-meta"></p><code id="result-path"></code>
-          <div class="result-actions"><button id="reveal" class="button primary">Mở thư mục kết quả</button><button id="download" class="button secondary">Tải ZIP</button></div>
-          <p id="delete-reminder" class="delete-reminder" hidden>Gói có file cần xóa riêng. Xem deleted-files.txt trước khi triển khai.</p>
-          <details id="publish-box" class="details" hidden><summary>Tạo & push tag production</summary><p id="publish-copy"></p><label class="check-row"><input id="publish-ack" type="checkbox"><span>Tôi đồng ý tạo tag nếu chưa có và push tag này lên origin.</span></label><button id="publish" class="button secondary" disabled>Tạo & push tag</button></details>
+          <div class="result-actions"><button id="reveal" class="button primary" type="button"><span data-i18n>Mở thư mục kết quả</span></button><button id="download" class="button secondary" type="button"><span data-i18n>Tải ZIP</span></button></div>
+          <p id="delete-reminder" class="delete-reminder" hidden data-i18n>Gói có file cần xóa riêng. Xem deleted-files.txt trước khi triển khai.</p>
+          <details id="publish-box" class="details" hidden><summary data-i18n>Tạo & push tag production</summary><p id="publish-copy"></p><label class="check-row"><input id="publish-ack" type="checkbox"><span data-i18n>Tôi đồng ý tạo tag nếu chưa có và push tag này lên origin.</span></label><button id="publish" class="button secondary" type="button" disabled><span data-i18n>Tạo & push tag</span></button></details>
         </section>
       </section>
     </div>
-    <footer><span>Zip Deployer</span><span>Đóng gói tại máy · Upload theo quy trình của bạn</span></footer>
+    <footer><span>Zip Deployer</span><span data-i18n>Đóng gói tại máy · Upload theo quy trình của bạn</span></footer>
   </main>
 </body>
 </html>
