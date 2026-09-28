@@ -2,13 +2,24 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { spawn } = require('node:child_process');
+const { spawn, execFile } = require('node:child_process');
 const core = require('./core');
+
+// windowsHide keeps the console hidden; pick-folder.ps1's invisible owner window absorbs the SW_HIDE
+// so the dialog itself shows (verified 2026-09-29: dialog visible and top-most, no console window).
+function pickFolder(start) {
+  const args = ['-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'pick-folder.ps1'), '-Start', typeof start === 'string' ? start : ''];
+  return new Promise((resolve, reject) => execFile('powershell.exe', args, { windowsHide: true, encoding: 'utf8', timeout: 600000 }, (err, stdout, stderr) => {
+    if (err && err.killed) return resolve(null); // left open 10 minutes: treat as cancel
+    if (err) return reject(new Error(`Không mở được hộp chọn thư mục: ${(stderr || err.message).trim().split(/\r?\n/)[0]}`));
+    resolve(stdout.replace(/^﻿/, '').trim() || null);
+  }));
+}
 
 function createServer(defaultRepo = '', { outputRoot } = {}) {
   const token = crypto.randomBytes(32).toString('hex');
   const instance = crypto.randomUUID();
-  let currentPreview, currentBuild;
+  let currentPreview, currentBuild, picking = false;
   const assets = { '/': ['index.html', 'text/html'], '/app.css': ['app.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'], '/i18n.js': ['i18n.js', 'text/javascript'] };
   const server = http.createServer(async (req, res) => {
     const origin = `http://127.0.0.1:${server.address().port}`;
@@ -34,7 +45,7 @@ function createServer(defaultRepo = '', { outputRoot } = {}) {
         res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${currentBuild.zipName}"` });
         return fs.createReadStream(currentBuild.zipPath).pipe(res);
       }
-      if (req.method !== 'POST' || !['/api/preview', '/api/build', '/api/publish', '/api/reveal', '/api/refs', '/api/shutdown'].includes(req.url)) return json(404, { error: 'Không tìm thấy thao tác.' });
+      if (req.method !== 'POST' || !['/api/preview', '/api/build', '/api/publish', '/api/reveal', '/api/refs', '/api/pick-folder', '/api/shutdown'].includes(req.url)) return json(404, { error: 'Không tìm thấy thao tác.' });
       if (!String(req.headers['content-type']).startsWith('application/json')) return json(415, { error: 'Yêu cầu JSON.' });
       let raw = '';
       for await (const chunk of req) { raw += chunk; if (raw.length > 16384) throw new Error('Yêu cầu quá lớn.'); }
@@ -53,6 +64,11 @@ function createServer(defaultRepo = '', { outputRoot } = {}) {
         return json(200, core.publish(currentBuild));
       }
       if (req.url === '/api/refs') return json(200, { refs: core.refs(body.repo) });
+      if (req.url === '/api/pick-folder') {
+        if (picking) throw new Error('Hộp chọn thư mục đang mở.');
+        picking = true;
+        try { return json(200, { path: await pickFolder(body.start) }); } finally { picking = false; }
+      }
       if (req.url === '/api/reveal') {
         // Only the current build or a folder listed in deploy history can be opened.
         const dir = body.dir ? core.historyDir(body.dir, outputRoot) : currentBuild?.dir;

@@ -134,5 +134,8 @@ const EN = {
   "nhánh remote": "remote",
   "tag": "tag",
   "Gợi ý branch / tag": "Branch / tag suggestions",
+  "Chọn thư mục…": "Browse…",
+  "Đang mở hộp chọn thư mục…": "Opening folder picker…",
+  "Hộp chọn thư mục đang mở.": "The folder picker is already open.",
 };
 if (typeof module !== 'undefined') module.exports = EN;

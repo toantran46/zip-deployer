@@ -233,6 +233,12 @@ $('download').onclick = () => work('Đang chuẩn bị tải ZIP…', async () =
 $('publish').onclick = () => work('Đang tạo / kiểm tra và push tag…', async () => { const data = await api('publish', { id: result.id, confirmTag: result.tag }); $('publish-ack').checked = false; notice(data.message); });
 $('shutdown').onclick = () => work('Đang dừng app…', async () => { const data = await api('shutdown', {}); stopped = true; notice(data.message); });
 $('repo').addEventListener('change', () => loadRefs());
+$('browse').onclick = () => work('Đang mở hộp chọn thư mục…', async () => {
+  const picked = (await api('pick-folder', { start: $('repo').value.trim() })).path;
+  if (!picked) { lastNotice = null; renderNotice(); return; }
+  $('repo').value = picked; invalidate(); renderHeader();
+  await loadRefs({ showErrors: true });
+});
 combobox($('base')); combobox($('target'));
 $('history-open').onclick = async () => {
   try { builds = (await api('history')).builds; renderHistory(); $('history-dialog').showModal(); } catch (e) { notice(e.message, true); }
