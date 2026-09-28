@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const token = document.querySelector('meta[name="app-token"]').content;
-let preview, result, busy = false, stopped = false, filter = 'all', lang = 'vi', lastNotice = null;
+let preview, result, busy = false, stopped = false, filter = 'all', lang = 'en', lastNotice = null;
 const store = { get: key => { try { return localStorage.getItem(key); } catch { return null; } }, set: (key, value) => { try { localStorage.setItem(key, value); } catch {} } };
 // Keys are the Vietnamese source strings (EN lives in i18n.js); {name} placeholders are filled from vars.
 // ponytail: interpolated backend errors (git stderr, "Đóng ZIP thất bại: …", "Đã push tag …") stay Vietnamese; add error codes if EN users hit them.
@@ -256,6 +256,6 @@ $('lang-vi').onclick = () => setLang('vi');
 $('lang-en').onclick = () => setLang('en');
 
 applyTheme(store.get('zd-theme'));
-lang = store.get('zd-lang') === 'en' ? 'en' : 'vi';
+lang = store.get('zd-lang') === 'vi' ? 'vi' : 'en';
 invalidate(); applyLang();
 api('context').then(data => { $('repo').value = data.repo || ''; renderHeader(); loadRefs(); }).catch(e => notice('Không kết nối được app: {error}', true, { error: e.message }));
