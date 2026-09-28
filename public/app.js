@@ -107,6 +107,34 @@ function invalidate() {
   preview = null; result = null; lastNotice = null;
   renderEnv(); renderPreview(); renderResult(); renderNotice(); updateButtons();
 }
+async function loadTags() {
+  // Suggestions only: a failure just leaves the datalist empty.
+  const repo = $('repo').value.trim();
+  let tags = [];
+  if (repo) try { tags = (await api('tags', { repo })).tags; } catch {}
+  $('tag-options').replaceChildren(...tags.map(tag => { const option = el('option'); option.value = tag; return option; }));
+}
+let builds = null;
+function historyRow(build) {
+  const row = el('div', 'history-row'), main = el('div', 'history-main'), title = el('div', 'history-title');
+  title.append(el('span', `badge ${build.environment}`, build.environment === 'prod' ? 'Production' : 'Staging'), el('code', '', build.tag || build.target));
+  const meta = [`${sha8(build.baseSha)} → ${sha8(build.targetSha)}`, t('{n} file', { n: build.files })];
+  if (build.deleted) meta.push(t('{n} file cần xóa', { n: build.deleted }));
+  meta.push(build.zipBytes === null ? '—' : `${(build.zipBytes / 1024).toLocaleString(locale(), { maximumFractionDigits: 1 })} KB`, new Date(build.createdAt).toLocaleString(locale()));
+  main.append(title, el('span', 'history-meta', meta.join(' · ')));
+  const open = el('button', 'button secondary', t('Mở thư mục')); open.type = 'button';
+  open.onclick = () => api('reveal', { dir: build.dir }).catch(e => { $('history-dialog').close(); notice(e.message, true); });
+  row.append(main, open);
+  return row;
+}
+function renderHistory() {
+  if (!builds) return;
+  $('history-list').replaceChildren(...(builds.length ? builds.map(historyRow) : [el('p', 'no-files', t('Chưa có bản đóng gói nào trong output/.'))]));
+}
+function renderRules() {
+  const rules = preview ? preview.ignoreRules : null;
+  list('rules-list', !rules ? [t('Xem trước thay đổi để đọc .zipignore từ commit đích.')] : !rules.length ? [t('Commit đích không có quy tắc .zipignore.')] : rules.map(rule => rule.startsWith('!') ? `${rule} ${t('(bị bỏ qua: không thể bỏ loại trừ)')}` : rule));
+}
 function applyTheme(theme) { document.documentElement.dataset.theme = theme; $('theme-toggle').setAttribute('aria-pressed', theme === 'dark'); }
 
 $('release-form').addEventListener('input', invalidate);
@@ -144,8 +172,13 @@ $('download').onclick = () => work('Đang chuẩn bị tải ZIP…', async () =
 });
 $('publish').onclick = () => work('Đang tạo / kiểm tra và push tag…', async () => { const data = await api('publish', { id: result.id, confirmTag: result.tag }); $('publish-ack').checked = false; notice(data.message); });
 $('shutdown').onclick = () => work('Đang dừng app…', async () => { const data = await api('shutdown', {}); stopped = true; notice(data.message); });
+$('repo').addEventListener('change', loadTags);
+$('history-open').onclick = async () => {
+  try { builds = (await api('history')).builds; renderHistory(); $('history-dialog').showModal(); } catch (e) { notice(e.message, true); }
+};
+$('rules-open').onclick = () => { renderRules(); $('rules-dialog').showModal(); };
 $('theme-toggle').onclick = () => { const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; store.set('zd-theme', next); applyTheme(next); };
 
 applyTheme(store.get('zd-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 invalidate();
-api('context').then(data => { $('repo').value = data.repo || ''; renderHeader(); }).catch(e => notice('Không kết nối được app: {error}', true, { error: e.message }));
+api('context').then(data => { $('repo').value = data.repo || ''; renderHeader(); loadTags(); }).catch(e => notice('Không kết nối được app: {error}', true, { error: e.message }));

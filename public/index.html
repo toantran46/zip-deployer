@@ -93,5 +93,20 @@
     </div>
     <footer><span>Zip Deployer</span><span data-i18n>Đóng gói tại máy · Upload theo quy trình của bạn</span></footer>
   </main>
+  <dialog id="history-dialog" class="dialog" aria-labelledby="history-title">
+    <div class="dialog-head"><h2 id="history-title" data-i18n>Lịch sử deploy</h2><form method="dialog"><button class="icon-button small" aria-label="Đóng">×</button></form></div>
+    <div class="dialog-body"><p class="dialog-note" data-i18n>Các bản đóng gói trong thư mục output/ của app. Xóa một thư mục sẽ xóa nó khỏi lịch sử.</p><div id="history-list" class="history-list"></div></div>
+  </dialog>
+  <dialog id="rules-dialog" class="dialog" aria-labelledby="rules-title">
+    <div class="dialog-head"><h2 id="rules-title" data-i18n>Quy tắc loại trừ</h2><form method="dialog"><button class="icon-button small" aria-label="Đóng">×</button></form></div>
+    <div class="dialog-body">
+      <p class="dialog-note" data-i18n>.zipignore chỉ thêm đường dẫn bị loại trừ; không bao giờ bỏ chặn file nhạy cảm như wp-config.php, .env hay khóa riêng.</p>
+      <span class="label" data-i18n>Luôn loại trừ (tích hợp sẵn)</span>
+      <div class="chips"><code>docs/</code><code>tools/</code><code>tests/</code><code>.agents/</code><code>.claude/</code><code>.codex/</code><code>.github/</code><code>.deploy-temp/</code><code>node_modules/</code><code>AGENTS.md</code><code>CLAUDE.md</code><code>deploy-files.txt</code><code>.zipignore</code></div>
+      <span class="label" data-i18n>Quy tắc từ .zipignore (commit đích)</span>
+      <ul id="rules-list" class="path-list"></ul>
+      <p class="dialog-note" data-i18n>Mỗi dòng một mẫu, tính từ gốc repo: * khớp trong một thư mục, ** khớp qua nhiều thư mục, dòng bắt đầu bằng # là ghi chú.</p>
+    </div>
+  </dialog>
 </body>
 </html>
