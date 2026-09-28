@@ -61,7 +61,7 @@ Remove `windowsHide: true` from the `explorer.exe` spawn in `/api/reveal`. Nothi
 ### 1.4 Readable output folder names
 
 - `preview()` returns `label` (the already-sanitised `tag || target` value, `[a-zA-Z0-9._-]`, max 70 chars, SHA fallback) alongside `zipName`.
-- `build(p, { outputRoot, now = new Date() })` creates `{environment}-{label}-{YYYYMMDD}-{HHmm}` in local time, e.g. `prod-1.44.0-20260929-1430`, `staging-release-1.44.0-rc-20260929-1015`.
+- `build(p, { outputRoot, now = new Date() })` creates `{environment}-{label}-{YYYYMMDD}-{HHmm}` in local time, with `label` cut to 40 characters in the folder name only (Windows 260-character path limit in `zip.ps1`; added after final review), e.g. `prod-1.44.0-20260929-1430`, `staging-release-1.44.0-rc-20260929-1015`.
 - Created with non-recursive `fs.mkdirSync`; on `EEXIST` retry with `-2` … `-99`, then throw `Không tạo được thư mục kết quả mới.` ("Couldn't create a new output folder."). An existing folder is never reused or overwritten, preserving the current guarantee.
 - `now` is injectable so the same-minute collision test is deterministic; `createdAt` uses the same `now`.
 - `history()` regex `^(prod|staging)-` and `historyDir()` are unchanged, so legacy `prod-lbqZDC`-style folders keep appearing in history.

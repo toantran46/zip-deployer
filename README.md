@@ -47,7 +47,7 @@ The UI is in English by default. The header has a **VI | EN** language switch an
 
 ## Output
 
-Each build gets its own folder under `output/`, named `{environment}-{label}-{YYYYMMDD-HHmm}` in local time, for example `output/prod-1.44.0-20260929-1430/` or `output/staging-release-1.44.0-rc-20260929-1015/`. The label is the production tag, or the Target for staging. If the name is taken, `-2`, `-3` and so on is added, so an existing build is never overwritten.
+Each build gets its own folder under `output/`, named `{environment}-{label}-{YYYYMMDD-HHmm}` in local time, for example `output/prod-1.44.0-20260929-1430/` or `output/staging-release-1.44.0-rc-20260929-1015/`. The label is the production tag, or the Target for staging, cut to 40 characters to stay clear of Windows' path-length limit (the ZIP name keeps it whole). If the name is taken, `-2`, `-3` and so on is added, so an existing build is never overwritten.
 
 | File | Contents |
 |---|---|

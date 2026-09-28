@@ -180,6 +180,14 @@ test('build folders are named env-label-date-time and never reuse an existing fo
     ['prod-1.1.0-20260929-1430', 'prod-1.1.0-20260929-1430-2', 'prod-lbqZDC', 'staging-feature-ABC-12_x-20260929-1430']);
 });
 
+test('long labels are cut to 40 characters in the folder name but kept whole in the ZIP name', () => {
+  // Windows' 260-character path limit applies to output\<dir>\files\<repo path> in zip.ps1.
+  const f = fixture(); const long = 'feature/' + 'x'.repeat(60); f.git('branch', long);
+  const built = build(preview({ ...f.request, environment: 'staging', target: long }), { outputRoot: path.join(f.repo, 'out'), acknowledgeDeletes: true, now: new Date(2026, 8, 29, 14, 30) });
+  assert.equal(path.basename(built.dir), `staging-feature-${'x'.repeat(32)}-20260929-1430`);
+  assert.equal(built.zipName, `deploy-staging-feature-${'x'.repeat(60)}.zip`);
+});
+
 test('refs lists branches, remote branches and tags, skips origin/HEAD, and every name resolves', () => {
   const f = fixture(); const branch = f.git('branch', '--show-current').trim();
   const remote = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-helper-remote-'));

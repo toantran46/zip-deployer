@@ -47,7 +47,7 @@ Giao diện mặc định là tiếng Anh. Thanh trên cùng có nút chuyển n
 
 ## Kết quả
 
-Mỗi lần đóng gói có một thư mục riêng trong `output/`, đặt tên `{môi trường}-{nhãn}-{YYYYMMDD-HHmm}` theo giờ máy, ví dụ `output/prod-1.44.0-20260929-1430/` hoặc `output/staging-release-1.44.0-rc-20260929-1015/`. Nhãn là tag production, hoặc Target với staging. Nếu tên đã có, app thêm `-2`, `-3`…, nên bản đóng gói cũ không bao giờ bị ghi đè.
+Mỗi lần đóng gói có một thư mục riêng trong `output/`, đặt tên `{môi trường}-{nhãn}-{YYYYMMDD-HHmm}` theo giờ máy, ví dụ `output/prod-1.44.0-20260929-1430/` hoặc `output/staging-release-1.44.0-rc-20260929-1015/`. Nhãn là tag production, hoặc Target với staging, cắt còn 40 ký tự để tránh giới hạn độ dài đường dẫn của Windows (tên file ZIP vẫn giữ nguyên). Nếu tên đã có, app thêm `-2`, `-3`…, nên bản đóng gói cũ không bao giờ bị ghi đè.
 
 | File | Nội dung |
 |---|---|

@@ -120,7 +120,8 @@ function build(p, options = {}) {
   if (p.tag) tagCheck(p.repo, p.tag, p.targetSha);
   const outputRoot = options.outputRoot || OUTPUT_ROOT, now = options.now || new Date();
   fs.mkdirSync(outputRoot, { recursive: true });
-  const dir = newOutputDir(outputRoot, `${p.environment}-${p.label}-${stamp(now)}`);
+  // Label capped at 40: zip.ps1 (.NET Framework) hits the 260-char path limit under output\<dir>\files\.
+  const dir = newOutputDir(outputRoot, `${p.environment}-${p.label.slice(0, 40)}-${stamp(now)}`);
   const stage = path.join(dir, 'files'); fs.mkdirSync(stage);
   const files = p.files.map(file => {
     const content = git(p.repo, ['cat-file', 'blob', file.oid], true);
