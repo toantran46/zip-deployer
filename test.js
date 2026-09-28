@@ -156,3 +156,18 @@ test('tags lists newest first; history lists builds newest first and skips broke
   assert.equal(historyDir(first.dir, out), first.dir);
   for (const bad of [out, path.join(out, 'prod-crashed'), path.join(first.dir, '..', '..'), 'C:\Windows']) assert.throws(() => historyDir(bad, out), /lịch sử/);
 });
+
+test('every Vietnamese UI string has an English translation', () => {
+  const EN = require('./public/i18n.js');
+  const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
+  const html = read('public/index.html'), js = read('public/app.js'), backend = read('core.js') + read('server.js') + js;
+  const keys = [
+    ...[...html.matchAll(/data-i18n>([^<]+)</g)].map(m => m[1].trim()),
+    ...[...html.matchAll(/(?:placeholder|aria-label|title)="([^"]+)"/g)].map(m => m[1]),
+    ...[...js.matchAll(/\b(?:t|notice|work)\('([^']+)'/g)].map(m => m[1]),
+    ...[...backend.matchAll(/(?:new Error|error:|message:|reason:)\s*\(?'([^']+)'/g)].map(m => m[1]),
+    ...[...backend.matchAll(/return '([^']+)';/g)].map(m => m[1]),
+  ];
+  const missing = [...new Set(keys)].filter(k => !(k in EN));
+  assert.deepEqual(missing, []);
+});

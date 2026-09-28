@@ -2,8 +2,9 @@ const $ = id => document.getElementById(id);
 const token = document.querySelector('meta[name="app-token"]').content;
 let preview, result, busy = false, stopped = false, filter = 'all', lang = 'vi', lastNotice = null;
 const store = { get: key => { try { return localStorage.getItem(key); } catch { return null; } }, set: (key, value) => { try { localStorage.setItem(key, value); } catch {} } };
-// Keys are the Vietnamese source strings; {name} placeholders are filled from vars.
-function t(text, vars = {}) { return String(text).replace(/\{(\w+)\}/g, (m, k) => k in vars ? vars[k] : m); }
+// Keys are the Vietnamese source strings (EN lives in i18n.js); {name} placeholders are filled from vars.
+// ponytail: interpolated backend errors (git stderr, "Đóng ZIP thất bại: …", "Đã push tag …") stay Vietnamese; add error codes if EN users hit them.
+function t(text, vars = {}) { return String((lang === 'en' && EN[text]) || text).replace(/\{(\w+)\}/g, (m, k) => k in vars ? vars[k] : m); }
 const locale = () => lang === 'en' ? 'en-GB' : 'vi-VN';
 const basename = p => p.split(/[\\/]/).filter(Boolean).pop() || p;
 const sha8 = sha => sha.slice(0, 8);
@@ -135,6 +136,18 @@ function renderRules() {
   const rules = preview ? preview.ignoreRules : null;
   list('rules-list', !rules ? [t('Xem trước thay đổi để đọc .zipignore từ commit đích.')] : !rules.length ? [t('Commit đích không có quy tắc .zipignore.')] : rules.map(rule => rule.startsWith('!') ? `${rule} ${t('(bị bỏ qua: không thể bỏ loại trừ)')}` : rule));
 }
+function applyLang() {
+  document.documentElement.lang = lang;
+  for (const code of ['vi', 'en']) $(`lang-${code}`).setAttribute('aria-pressed', lang === code);
+  for (const node of document.querySelectorAll('[data-i18n]')) { node.dataset.vi ??= node.textContent.trim(); node.textContent = t(node.dataset.vi); }
+  for (const attr of ['placeholder', 'aria-label', 'title']) {
+    const key = 'vi' + attr.replace(/(^|-)(\w)/g, (_, __, c) => c.toUpperCase());
+    for (const node of document.querySelectorAll(`[${attr}]`)) { node.dataset[key] ??= node.getAttribute(attr); node.setAttribute(attr, t(node.dataset[key])); }
+  }
+  renderHeader(); renderNotice(); renderPreview(); renderResult(); renderHistory();
+  if ($('rules-dialog').open) renderRules();
+}
+function setLang(code) { lang = code; store.set('zd-lang', code); applyLang(); }
 function applyTheme(theme) { document.documentElement.dataset.theme = theme; $('theme-toggle').setAttribute('aria-pressed', theme === 'dark'); }
 
 $('release-form').addEventListener('input', invalidate);
@@ -179,6 +192,10 @@ $('history-open').onclick = async () => {
 $('rules-open').onclick = () => { renderRules(); $('rules-dialog').showModal(); };
 $('theme-toggle').onclick = () => { const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; store.set('zd-theme', next); applyTheme(next); };
 
+$('lang-vi').onclick = () => setLang('vi');
+$('lang-en').onclick = () => setLang('en');
+
 applyTheme(store.get('zd-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-invalidate();
+lang = store.get('zd-lang') === 'en' ? 'en' : 'vi';
+invalidate(); applyLang();
 api('context').then(data => { $('repo').value = data.repo || ''; renderHeader(); loadTags(); }).catch(e => notice('Không kết nối được app: {error}', true, { error: e.message }));

@@ -9,7 +9,7 @@ function createServer(defaultRepo = '') {
   const token = crypto.randomBytes(32).toString('hex');
   const instance = crypto.randomUUID();
   let currentPreview, currentBuild;
-  const assets = { '/': ['index.html', 'text/html'], '/app.css': ['app.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'] };
+  const assets = { '/': ['index.html', 'text/html'], '/app.css': ['app.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'], '/i18n.js': ['i18n.js', 'text/javascript'] };
   const server = http.createServer(async (req, res) => {
     const origin = `http://127.0.0.1:${server.address().port}`;
     res.setHeader('Cache-Control', 'no-store');
