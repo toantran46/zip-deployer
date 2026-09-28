@@ -37,10 +37,31 @@ function tagCheck(repo, tag, sha) {
   if (exists && ref(repo, `refs/tags/${tag}`) !== sha) throw new Error('Tag đã tồn tại và trỏ đến commit khác. Tool không ghi đè tag.');
   return Boolean(exists);
 }
+const OUTPUT_ROOT = path.join(__dirname, 'output');
+function repoRoot(repo) {
+  if (typeof repo !== 'string' || !path.isAbsolute(repo)) throw new Error('Nhập đường dẫn tuyệt đối đến repository.');
+  return git(repo, ['rev-parse', '--show-toplevel']).trim();
+}
+function tags(repo) { return git(repoRoot(repo), ['tag', '--list', '--sort=-creatordate']).split('\n').filter(Boolean).slice(0, 20); }
+// ponytail: reads every manifest per call; add an index file if output/ grows to thousands of builds.
+function history(outputRoot = OUTPUT_ROOT) {
+  if (!fs.existsSync(outputRoot)) return [];
+  return fs.readdirSync(outputRoot, { withFileTypes: true }).filter(d => d.isDirectory() && /^(prod|staging)-/.test(d.name)).flatMap(d => {
+    const dir = path.join(outputRoot, d.name);
+    try {
+      const m = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+      return [{ dir, environment: m.environment, tag: m.tag, target: m.target, base: m.base, baseSha: m.baseSha, targetSha: m.targetSha, zipName: m.zipName, files: m.files.length, deleted: m.deleted.length, zipBytes: m.zipBytes ?? null, createdAt: m.createdAt }];
+    } catch { return []; }
+  }).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 50);
+}
+function historyDir(dir, outputRoot = OUTPUT_ROOT) {
+  const resolved = path.resolve(String(dir));
+  if (path.dirname(resolved) !== path.resolve(outputRoot) || !fs.existsSync(path.join(resolved, 'manifest.json'))) throw new Error('Thư mục không thuộc lịch sử deploy.');
+  return resolved;
+}
 function preview(input) {
   if (!['staging', 'prod'].includes(input.environment)) throw new Error('Chọn staging hoặc production.');
-  if (typeof input.repo !== 'string' || !path.isAbsolute(input.repo)) throw new Error('Nhập đường dẫn tuyệt đối đến repository.');
-  const repo = git(input.repo, ['rev-parse', '--show-toplevel']).trim();
+  const repo = repoRoot(input.repo);
   const baseSha = ref(repo, input.base), targetSha = ref(repo, input.target);
   const tag = input.environment === 'prod' ? String(input.tag || '').trim() : '';
   if (tag) tagCheck(repo, tag, targetSha);
@@ -78,7 +99,7 @@ function build(p, options = {}) {
   if (p.deleted.length && !options.acknowledgeDeletes) throw new Error('Cần xác nhận xử lý file xóa trên hosting.');
   if (!p.files.length) throw new Error('Không có file thêm/sửa để đóng ZIP.');
   if (p.tag) tagCheck(p.repo, p.tag, p.targetSha);
-  const outputRoot = options.outputRoot || path.join(__dirname, 'output');
+  const outputRoot = options.outputRoot || OUTPUT_ROOT;
   fs.mkdirSync(outputRoot, { recursive: true });
   const dir = fs.mkdtempSync(path.join(outputRoot, `${p.environment}-`));
   const stage = path.join(dir, 'files'); fs.mkdirSync(stage);
@@ -97,8 +118,8 @@ function build(p, options = {}) {
     if (actual.length !== files.length || actual.some(x => { const expected = files.find(f => f.path === x.path); return !expected || expected.sha256 !== x.sha256 || expected.size !== x.size || x.path.includes('\\'); })) throw new Error('Nội dung ZIP không khớp commit.');
     fs.writeFileSync(path.join(dir, 'deploy-files.txt'), files.map(x => x.path).join('\n') + '\n');
     fs.writeFileSync(path.join(dir, 'deleted-files.txt'), p.deleted.join('\n') + (p.deleted.length ? '\n' : ''));
-    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(result, null, 2));
     result.zipBytes = fs.statSync(zipPath).size;
+    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(result, null, 2));
     return result;
   } catch (e) {
     // Only this newly created file is removed. Existing outputs are never replaced.
@@ -113,4 +134,4 @@ function publish(result) {
   catch (e) { throw new Error(`Tag local đã tồn tại; push chưa thành công. Có thể thử lại, không cần tạo lại ZIP. ${e.message}`); }
   return { message: `Đã push tag ${result.tag} lên origin. Chưa upload hoặc deploy.` };
 }
-module.exports = { preview, build, publish };
+module.exports = { preview, build, publish, tags, history, historyDir, OUTPUT_ROOT };

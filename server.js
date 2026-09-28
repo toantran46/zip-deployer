@@ -28,12 +28,13 @@ function createServer(defaultRepo = '') {
     if (req.headers['x-app-token'] !== token) return json(403, { error: 'Phiên làm việc không hợp lệ. Mở lại app.' });
     try {
       if (req.method === 'GET' && req.url === '/api/context') return json(200, { repo: defaultRepo });
+      if (req.method === 'GET' && req.url === '/api/history') return json(200, { builds: core.history() });
       if (req.method === 'GET' && req.url === '/api/download') {
         if (!currentBuild) throw new Error('Chưa có ZIP đã xác minh.');
         res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${currentBuild.zipName}"` });
         return fs.createReadStream(currentBuild.zipPath).pipe(res);
       }
-      if (req.method !== 'POST' || !['/api/preview', '/api/build', '/api/publish', '/api/reveal', '/api/shutdown'].includes(req.url)) return json(404, { error: 'Không tìm thấy thao tác.' });
+      if (req.method !== 'POST' || !['/api/preview', '/api/build', '/api/publish', '/api/reveal', '/api/tags', '/api/shutdown'].includes(req.url)) return json(404, { error: 'Không tìm thấy thao tác.' });
       if (!String(req.headers['content-type']).startsWith('application/json')) return json(415, { error: 'Yêu cầu JSON.' });
       let raw = '';
       for await (const chunk of req) { raw += chunk; if (raw.length > 16384) throw new Error('Yêu cầu quá lớn.'); }
@@ -51,10 +52,13 @@ function createServer(defaultRepo = '') {
         if (!currentBuild || body.id !== currentBuild.id || body.confirmTag !== currentBuild.tag) throw new Error('Xác nhận đúng tag của ZIP đã tạo.');
         return json(200, core.publish(currentBuild));
       }
+      if (req.url === '/api/tags') return json(200, { tags: core.tags(body.repo) });
       if (req.url === '/api/reveal') {
-        if (!currentBuild) throw new Error('Chưa có kết quả.');
-        const child = spawn('explorer.exe', [currentBuild.dir], { detached: true, stdio: 'ignore', windowsHide: true });
-        child.on('error', () => {}); child.unref(); return json(200, { dir: currentBuild.dir });
+        // Only the current build or a folder listed in deploy history can be opened.
+        const dir = body.dir ? core.historyDir(body.dir) : currentBuild?.dir;
+        if (!dir) throw new Error('Chưa có kết quả.');
+        const child = spawn('explorer.exe', [dir], { detached: true, stdio: 'ignore', windowsHide: true });
+        child.on('error', () => {}); child.unref(); return json(200, { dir });
       }
       json(200, { message: 'Đã dừng app. Bạn có thể đóng tab này.' });
       server.close();

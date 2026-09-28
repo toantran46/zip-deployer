@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { preview, build, publish } = require('./core');
+const { preview, build, publish, tags, history, historyDir } = require('./core');
 
 function fixture() {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-helper-test-'));
@@ -94,6 +94,9 @@ test('HTTP server protects operations and completes preview/build/download witho
   const download = await fetch(url + '/api/download', { headers });
   assert.equal(download.status, 200);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), fs.readFileSync(output.zipPath));
+  assert.deepEqual((await (await post('tags', { repo: f.repo })).json()).tags, ['1.0.0']);
+  assert.equal((await fetch(url + '/api/history', { headers })).status, 200);
+  assert.equal((await post('reveal', { dir: 'C:\\Windows' })).status, 400);
   assert(!f.git('tag').includes('1.1.0'));
   console.log(`Browser fixture: ${f.repo}`);
 });
@@ -136,4 +139,20 @@ test('.zipignore from the target commit adds exclusions but never unblocks', () 
   const all = preview(f.request);
   assert.equal(all.files.length, 0);
   assert.throws(() => build({ ...all, blocked: [] }, { outputRoot: path.join(f.repo, 'out'), acknowledgeDeletes: true }), /Không có file/);
+});
+
+test('tags lists newest first; history lists builds newest first and skips broken folders', () => {
+  const f = fixture(); f.git('tag', '1.0.1');
+  assert.deepEqual(tags(f.repo).slice(0, 2).sort(), ['1.0.0', '1.0.1']);
+  assert.throws(() => tags('relative/path'), /tuyệt đối/);
+  const out = path.join(f.repo, 'out');
+  const first = build(preview(f.request), { outputRoot: out, acknowledgeDeletes: true });
+  const second = build(preview({ ...f.request, environment: 'staging' }), { outputRoot: out, acknowledgeDeletes: true });
+  fs.mkdirSync(path.join(out, 'prod-crashed')); // no manifest
+  fs.mkdirSync(path.join(out, 'staging-corrupt')); fs.writeFileSync(path.join(out, 'staging-corrupt', 'manifest.json'), '{oops');
+  const h = history(out);
+  assert.deepEqual(h.map(x => x.dir), [second.dir, first.dir]);
+  assert.equal(h[1].files, 3); assert.equal(h[1].tag, '1.1.0'); assert(h[1].zipBytes > 0);
+  assert.equal(historyDir(first.dir, out), first.dir);
+  for (const bad of [out, path.join(out, 'prod-crashed'), path.join(first.dir, '..', '..'), 'C:\Windows']) assert.throws(() => historyDir(bad, out), /lịch sử/);
 });
