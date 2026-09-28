@@ -81,7 +81,7 @@ Remove `windowsHide: true` from the `explorer.exe` spawn in `/api/reveal`. Nothi
 - Filtering: case-insensitive substring. Names starting with the query rank first, then other matches; recency order within each group. Empty query shows the newest refs. At most 50 rows rendered; the popup scrolls (max-height about 320px). No matches → popup hidden. Free text is always allowed (commit SHAs).
 - Row: mono ref name with the matched substring in bold, muted kind label on the right: `nhánh` / `nhánh remote` / `tag` (EN `branch` / `remote` / `tag`).
 - Keyboard: ↓/↑ move the active row (wrapping), Enter picks the active row and does not submit the form while the popup is open with an active row, Esc closes, Tab closes and keeps the typed value. Mouse: `mousedown` picks (prevents blur first). Blur closes.
-- Picking sets the value and dispatches `input` so `invalidate()` runs exactly as typing does.
+- Picking sets the value, closes the popup and calls `invalidate()`, the same effect as typing (a synthetic `input` event would reopen the popup).
 - ARIA combobox pattern: input `role="combobox"`, `aria-autocomplete="list"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`; popup `role="listbox"`, rows `role="option"` with `aria-selected`.
 - Styling from existing tokens: popup `--surface`, 1px `--line`, radius 10px, `--shadow`, positioned under the input (`.field` becomes `position: relative`); active row `--accent-soft` background, `--accent` text; kind label `--muted`, 11px. Works in both themes.
 
