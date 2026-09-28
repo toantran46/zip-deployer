@@ -57,7 +57,8 @@ function createServer(defaultRepo = '', { outputRoot } = {}) {
         // Only the current build or a folder listed in deploy history can be opened.
         const dir = body.dir ? core.historyDir(body.dir, outputRoot) : currentBuild?.dir;
         if (!dir) throw new Error('Chưa có kết quả.');
-        const child = spawn('explorer.exe', [dir], { detached: true, stdio: 'ignore', windowsHide: true });
+        // No windowsHide: Explorer applies SW_HIDE to the folder window it opens, so it stayed invisible.
+        const child = spawn('explorer.exe', [dir], { detached: true, stdio: 'ignore' });
         child.on('error', () => {}); child.unref(); return json(200, { dir });
       }
       json(200, { message: 'Đã dừng app. Bạn có thể đóng tab này.' });
